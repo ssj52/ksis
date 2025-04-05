@@ -14,7 +14,6 @@ DEFAULT_PORT = 8080
 def parse_http_request(request_data):
     """Парсинг HTTP запроса для получения метода, URL и версии HTTP"""
     try:
-        # Получаем первую строку запроса
         request_line = request_data.split(b'\r\n')[0].decode('utf-8')
         method, url, version = request_line.split(' ')
         return method, url, version
@@ -42,12 +41,10 @@ def modify_request_for_server(request_data, url):
         if parsed_url.query:
             path += "?" + parsed_url.query
 
-        # Заменяем полный URL на путь в первой строке запроса
         first_line = request_data.split(b'\r\n')[0].decode('utf-8')
         method, _, version = first_line.split(' ')
         new_first_line = f"{method} {path} {version}"
 
-        # Создаем новый запрос
         modified_request = request_data.replace(
             request_data.split(b'\r\n')[0],
             new_first_line.encode('utf-8')
@@ -92,14 +89,12 @@ def handle_client(client_socket, client_addr):
 
         print(f"[->] Получен запрос: {method} {url}")
 
-        # Определяем хост и порт для соединения
         try:
             if url.startswith('http://'):
                 parsed_url = urlparse(url)
                 host = parsed_url.hostname
                 port = parsed_url.port or 80
             else:
-                # Если URL не содержит схему, пытаемся получить хост из заголовков
                 host = get_host_from_headers(client_request)
                 port = 80
 
@@ -115,39 +110,31 @@ def handle_client(client_socket, client_addr):
 
         modified_request = modify_request_for_server(client_request, url)
 
-        # Создаем соединение с целевым сервером
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_socket.settimeout(TIMEOUT)
 
         try:
             server_socket.connect((host, port))
-            # Отправляем модифицированный запрос
             server_socket.sendall(modified_request)
 
-            # Получаем ответ от сервера
             server_response = b''
             response_complete = False
             start_time = time.time()
 
-            # Буфер для чтения ответа
             while True:
                 try:
                     chunk = server_socket.recv(BUFFER_SIZE)
                     if not chunk:
                         break
 
-                    # Отправляем часть ответа клиенту
                     client_socket.sendall(chunk)
 
-                    # Сохраняем начало ответа для анализа кода ответа
                     if not server_response:
                         server_response = chunk
                         response_code = get_response_code(server_response)
                         print(f"[<-] {url} -> {response_code}")
 
-                    # Для долгоживущих соединений (например, потоковое аудио)
-                    # устанавливаем разумный таймаут
-                    if time.time() - start_time > 60:  # 60 секунд для примера
+                    if time.time() - start_time > 60: 
                         print(f"[i] Соединение активно в течение 60+ секунд: {url}")
                         start_time = time.time()
 
@@ -174,7 +161,6 @@ def main():
     """Основная функция запуска прокси-сервера"""
     proxy_port = DEFAULT_PORT
 
-    # Создаем сокет сервера
     proxy_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     proxy_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
@@ -187,7 +173,6 @@ def main():
 
         while True:
             client_socket, client_addr = proxy_socket.accept()
-            # Создаем отдельный поток для обработки клиента
             client_thread = threading.Thread(target=handle_client, args=(client_socket, client_addr))
             client_thread.daemon = True
             client_thread.start()
